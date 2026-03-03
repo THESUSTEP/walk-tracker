@@ -17,52 +17,48 @@ html,body{margin:0;height:100%;font-family:system-ui;background:#f4f7f6}
   left:50%;
   transform:translateX(-50%);
   bottom:16px;
-
   background:rgba(255,255,255,.96);
   backdrop-filter:blur(12px);
   padding:14px 16px;
   border-radius:20px;
   box-shadow:0 15px 40px rgba(0,0,0,.22);
   text-align:center;
-
   width:92%;
   max-width:320px;
   touch-action:none;
 }
 
 .drag-handle{
-  width:46px;
-  height:5px;
-  background:#d1d5db;
-  border-radius:999px;
-  margin:0 auto 10px;
+  width:46px;height:5px;background:#d1d5db;
+  border-radius:999px;margin:0 auto 10px;
 }
 
 .stats{font-size:14px;margin-bottom:8px;line-height:1.5}
 .time{font-size:13px;color:#666}
 
-/* ===== BUTTONS ===== */
 button{
-  padding:12px 16px;
-  margin:4px;
-  border:none;
-  border-radius:999px;
-  font-size:15px;
-  font-weight:600;
-  cursor:pointer;
+  padding:12px 16px;margin:4px;border:none;
+  border-radius:999px;font-size:15px;font-weight:600;
 }
-
 .start{background:#22c55e;color:white}
 .pause{background:#f59e0b;color:white}
 .finish{background:#ef4444;color:white}
-button:disabled{opacity:.4;cursor:not-allowed}
+button:disabled{opacity:.4}
 
-.btn-row{
-  display:flex;
-  gap:8px;
-}
+.btn-row{display:flex;gap:8px}
 .btn-row button{flex:1}
 .finish{width:100%;margin-top:6px}
+
+/* ===== SUMMARY ===== */
+#summaryModal{
+  position:fixed;inset:0;background:rgba(0,0,0,.45);
+  display:none;align-items:center;justify-content:center;z-index:999;
+}
+.summary-card{
+  background:white;padding:28px;border-radius:24px;
+  width:85%;max-width:320px;text-align:center;
+  box-shadow:0 30px 80px rgba(0,0,0,.3);
+}
 </style>
 </head>
 
@@ -85,56 +81,68 @@ button:disabled{opacity:.4;cursor:not-allowed}
   <button id="finishBtn" class="finish">Finish</button>
 </div>
 
+<!-- SUMMARY -->
+<div id="summaryModal">
+  <div class="summary-card">
+    <h2>🎉 Walk Complete</h2>
+    <div style="font-size:18px;margin:10px 0">
+      <b id="sumDist">0.00</b> km
+    </div>
+    <div style="color:#666;margin-bottom:8px">
+      เวลา <b id="sumTime">00:00</b>
+    </div>
+    <div style="color:#16a34a;margin-bottom:20px">
+      ลด CO₂ <b id="sumCarbon">0.000</b> kg
+    </div>
+    <button onclick="closeSummary()" class="start">Done</button>
+  </div>
+</div>
+
 <script>
-// ================= CONFIG =================
-const EF_CAR = 0.192;
+// ===== CONFIG =====
+const EF_CAR=0.192;
 
-// ================= STATE =================
-let map, polyline, userMarker;
-let watchId=null;
-let totalDistance=0;
-let lastPoint=null;
-let pathCoords=[];
-let startTime=null;
-let elapsedBeforePause=0;
-
-let isTracking=false;
-let isPaused=false;
-let sessionActive=false;
-
+// ===== STATE =====
+let map,polyline,userMarker;
+let watchId=null,totalDistance=0,lastPoint=null,pathCoords=[];
+let startTime=null,elapsedBeforePause=0;
+let isTracking=false,isPaused=false,sessionActive=false;
 let timerInterval=null;
 
-// ================= MAP =================
+// ===== MAP =====
 function initMap(){
-  map=new google.maps.Map(document.getElementById("map"),{
-    center:{lat:13.7563,lng:100.5018},
-    zoom:16,
-    gestureHandling:"greedy"
-  });
+  map=new google.maps.Map(mapDiv,{center:{lat:13.7563,lng:100.5018},zoom:16});
 
   polyline=new google.maps.Polyline({
-    map,
-    path:[],
-    strokeColor:"#22c55e",
-    strokeWeight:5
+    map,path:[],strokeColor:"#22c55e",strokeWeight:5
   });
 
+  // ⭐ วงกลมน้ำเงินแบบเดิม
   userMarker=new google.maps.Marker({
     map,
-    position:{lat:13.7563,lng:100.5018}
+    position:{lat:13.7563,lng:100.5018},
+    icon:{
+      path:google.maps.SymbolPath.CIRCLE,
+      scale:8,
+      fillColor:"#3b82f6",
+      fillOpacity:1,
+      strokeColor:"#ffffff",
+      strokeWeight:3
+    },
+    zIndex:999
   });
 
   updateButtons();
 }
+const mapDiv=document.getElementById("map");
 window.onload=initMap;
 
-// ================= UI =================
+// ===== UI =====
 function updateUI(){
   const km=totalDistance/1000;
   distance.textContent=km.toFixed(2);
   carbon.textContent=(km*EF_CAR).toFixed(3);
 }
-
 function updateButtons(){
   startBtn.disabled=sessionActive;
   pauseBtn.disabled=!sessionActive;
@@ -142,20 +150,20 @@ function updateButtons(){
   pauseBtn.textContent=isPaused?"Resume":"Pause";
 }
 
-// ================= TIMER =================
+// ===== TIMER =====
 function startTimer(){
   clearInterval(timerInterval);
   timerInterval=setInterval(()=>{
-    if(!startTime) return;
+    if(!startTime)return;
     const diff=Date.now()-startTime;
     const m=Math.floor(diff/60000);
     const s=Math.floor((diff%60000)/1000);
     time.textContent=`${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
   },1000);
 }
-function stopTimer(){ clearInterval(timerInterval); }
+function stopTimer(){clearInterval(timerInterval);}
 
-// ================= DISTANCE =================
+// ===== DIST =====
 function getDistance(p1,p2){
   const R=6371000,toRad=x=>x*Math.PI/180;
   const dLat=toRad(p2.lat-p1.lat);
@@ -166,37 +174,34 @@ function getDistance(p1,p2){
   return 2*R*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
-// ================= GPS (⭐ FIXED PAUSE) =================
+// ⭐⭐⭐ FIXED PAUSE ⭐⭐⭐
 function handlePosition(pos){
   const {latitude,longitude,accuracy}=pos.coords;
-  if(accuracy>30) return;
+  if(accuracy>30)return;
 
   const current={lat:latitude,lng:longitude};
 
-  // ⭐ ถ้า pause หรือไม่ tracking → ไม่เก็บระยะ ไม่ลากเส้น
   if(!isTracking){
-    if(userMarker) userMarker.setPosition(current);
+    userMarker.setPosition(current);
     return;
   }
 
   if(lastPoint){
     const dist=getDistance(lastPoint,current);
-    if(dist>60) return;
+    if(dist>60)return;
     totalDistance+=dist;
   }
 
   lastPoint=current;
-
   pathCoords.push(current);
   polyline.setPath(pathCoords);
 
-  if(userMarker) userMarker.setPosition(current);
+  userMarker.setPosition(current);
   map.panTo(current);
-
   updateUI();
 }
 
-// ================= START =================
+// ===== START =====
 startBtn.onclick=()=>{
   if(!sessionActive){
     resetSession();
@@ -210,16 +215,15 @@ startBtn.onclick=()=>{
       {enableHighAccuracy:true,maximumAge:1000,timeout:10000}
     );
   }
-
   isTracking=true;
   isPaused=false;
   updateButtons();
 };
 
-// ================= PAUSE / RESUME =================
+// ===== PAUSE =====
 function pauseTracking(){
   if(isTracking){
-    elapsedBeforePause = Date.now()-startTime;
+    elapsedBeforePause=Date.now()-startTime;
     isTracking=false;
     isPaused=true;
     stopTimer();
@@ -233,25 +237,37 @@ function pauseTracking(){
 }
 pauseBtn.onclick=pauseTracking;
 
-// ================= FINISH =================
+// ===== FINISH =====
 finishBtn.onclick=()=>{
-  if(!confirm("Finish this walk?")) return;
+  if(!confirm("Finish this walk?"))return;
+
+  stopTimer();
+
+  // ⭐ แสดงผลก่อน reset
+  const km=totalDistance/1000;
+  sumDist.textContent=km.toFixed(2);
+  sumTime.textContent=time.textContent;
+  sumCarbon.textContent=(km*EF_CAR).toFixed(3);
+  summaryModal.style.display="flex";
 
   isTracking=false;
   isPaused=false;
-  stopTimer();
 
   if(watchId){
     navigator.geolocation.clearWatch(watchId);
     watchId=null;
   }
 
-  resetSession();
   sessionActive=false;
+  resetSession();
   updateButtons();
 };
 
-// ================= RESET =================
+function closeSummary(){
+  summaryModal.style.display="none";
+}
+
+// ===== RESET =====
 function resetSession(){
   totalDistance=0;
   lastPoint=null;
@@ -260,13 +276,12 @@ function resetSession(){
   elapsedBeforePause=0;
   isPaused=false;
   isTracking=false;
-
   polyline.setPath([]);
   time.textContent="00:00";
   updateUI();
 }
 
-// ================= DRAG POPUP =================
+// ===== DRAG =====
 const sheet=document.getElementById("controls");
 let startY=0,currentY=0,startBottom=16,dragging=false;
 
@@ -275,16 +290,14 @@ sheet.addEventListener("touchstart",e=>{
   startY=e.touches[0].clientY;
   startBottom=parseFloat(getComputedStyle(sheet).bottom);
 });
-
 sheet.addEventListener("touchmove",e=>{
-  if(!dragging) return;
+  if(!dragging)return;
   currentY=e.touches[0].clientY;
   const diff=startY-currentY;
   let next=startBottom+diff;
   next=Math.max(0,Math.min(window.innerHeight*0.6,next));
   sheet.style.bottom=next+"px";
 });
-
 sheet.addEventListener("touchend",()=>{
   dragging=false;
   const current=parseFloat(sheet.style.bottom)||0;
