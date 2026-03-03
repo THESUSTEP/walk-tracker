@@ -88,16 +88,30 @@ button:disabled{opacity:.4}
 </div>
 
 <script>
-const WEBHOOK_URL="https://script.google.com/macros/s/AKfycbxtrh7Nclznen6K-43DvIPwpHM-Pp8dUJ1DqfhhMfhwBdbLoNqDw5_fnetYez_5ZzUz/exec";
-const EF_CAR=0.192;
+// =============================
+// ⭐ CONFIG
+// =============================
+const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzHQhkFyEck1pyM2_OlgHbFP2HqsEgLcX295rWE4wH0prMwqpLJ7gMJWWbJgbER29D5/exec";
+const EF_CAR = 0.192;
 
-let map,polyline,userMarker;
-let watchId=null,totalDistance=0,lastPoint=null,pathCoords=[];
-let startTime=null,elapsedBeforePause=0;
-let isTracking=false,isPaused=false,sessionActive=false;
+// =============================
+// ⭐ STATE
+// =============================
+let map, polyline, userMarker;
+let watchId=null;
+let totalDistance=0;
+let lastPoint=null;
+let pathCoords=[];
+let startTime=null;
+let elapsedBeforePause=0;
+let isTracking=false;
+let isPaused=false;
+let sessionActive=false;
 let timerInterval=null;
 
-// ===== MAP =====
+// =============================
+// ⭐ MAP
+// =============================
 function initMap(){
   map=new google.maps.Map(document.getElementById("map"),{
     center:{lat:13.7563,lng:100.5018},
@@ -111,29 +125,32 @@ function initMap(){
 
   userMarker=new google.maps.Marker({
     map,
-    position:{lat:13.7563,lng:100.5018},
-    icon:{
-      path:google.maps.SymbolPath.CIRCLE,
-      scale:8,
-      fillColor:"#3b82f6",
-      fillOpacity:1,
-      strokeColor:"#ffffff",
-      strokeWeight:3
-    }
+    position:{lat:13.7563,lng:100.5018}
   });
 
   updateButtons();
 }
 window.onload=initMap;
 
-// ===== UI =====
+// =============================
+// ⭐ UI
+// =============================
 function updateUI(){
   const km=totalDistance/1000;
   distance.textContent=km.toFixed(2);
   carbon.textContent=(km*EF_CAR).toFixed(3);
 }
 
-// ===== TIMER =====
+function updateButtons(){
+  startBtn.disabled=sessionActive;
+  pauseBtn.disabled=!sessionActive;
+  finishBtn.disabled=!sessionActive;
+  pauseBtn.textContent=isPaused?"Resume":"Pause";
+}
+
+// =============================
+// ⭐ TIMER
+// =============================
 function startTimer(){
   clearInterval(timerInterval);
   timerInterval=setInterval(()=>{
@@ -146,7 +163,9 @@ function startTimer(){
 }
 function stopTimer(){clearInterval(timerInterval);}
 
-// ===== DIST =====
+// =============================
+// ⭐ DISTANCE
+// =============================
 function getDistance(p1,p2){
   const R=6371000,toRad=x=>x*Math.PI/180;
   const dLat=toRad(p2.lat-p1.lat);
@@ -158,12 +177,15 @@ function getDistance(p1,p2){
 }
 
 function handlePosition(pos){
-  if(!isTracking)return;
-
   const {latitude,longitude,accuracy}=pos.coords;
   if(accuracy>30)return;
 
   const current={lat:latitude,lng:longitude};
+
+  if(!isTracking){
+    userMarker.setPosition(current);
+    return;
+  }
 
   if(lastPoint){
     const dist=getDistance(lastPoint,current);
@@ -174,12 +196,15 @@ function handlePosition(pos){
   lastPoint=current;
   pathCoords.push(current);
   polyline.setPath(pathCoords);
+
   userMarker.setPosition(current);
   map.panTo(current);
   updateUI();
 }
 
-// ===== START
+// =============================
+// ⭐ START
+// =============================
 startBtn.onclick=()=>{
   if(!sessionActive){
     resetSession();
@@ -195,48 +220,57 @@ startBtn.onclick=()=>{
   }
   isTracking=true;
   isPaused=false;
+  updateButtons();
 };
 
-// ===== PAUSE
+// =============================
+// ⭐ PAUSE
+// =============================
 pauseBtn.onclick=()=>{
   if(isTracking){
     elapsedBeforePause=Date.now()-startTime;
     isTracking=false;
     isPaused=true;
     stopTimer();
-    pauseBtn.textContent="Resume";
   }else if(isPaused){
     isTracking=true;
     isPaused=false;
     startTime=new Date(Date.now()-elapsedBeforePause);
     startTimer();
-    pauseBtn.textContent="Pause";
   }
+  updateButtons();
 };
 
-// ===== FINISH ⭐ สำคัญ
+// =============================
+// ⭐ FINISH (ส่งเข้า SHEET)
+// =============================
 finishBtn.onclick=async()=>{
+  if(!confirm("Finish this walk?"))return;
+
   stopTimer();
 
   const endTime=new Date();
   const km=totalDistance/1000;
-  const durationSec=Math.round((endTime-startTime)/1000);
+  const durationMin=startTime?(endTime-startTime)/60000:0;
 
   try{
     await fetch(WEBHOOK_URL,{
       method:"POST",
       headers:{ "Content-Type":"text/plain;charset=utf-8" },
       body:JSON.stringify({
-        user_email:"",
+        user_email:"test@test.com",
         distance_m:Math.round(totalDistance),
-        duration_sec:durationSec,
+        duration_min:Number(durationMin.toFixed(2)),
         co2_saved_kg:Number((km*EF_CAR).toFixed(3)),
         started_at:startTime?startTime.toISOString():"",
         ended_at:endTime.toISOString(),
         gps_path:JSON.stringify(pathCoords)
       })
     });
-  }catch(e){console.error(e);}
+    console.log("✅ sent to sheet");
+  }catch(e){
+    console.error("❌ send error",e);
+  }
 
   sumDist.textContent=km.toFixed(2);
   sumTime.textContent=time.textContent;
@@ -250,6 +284,7 @@ finishBtn.onclick=async()=>{
 
   sessionActive=false;
   resetSession();
+  updateButtons();
 };
 
 function closeSummary(){
