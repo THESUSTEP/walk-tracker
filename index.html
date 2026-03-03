@@ -88,18 +88,13 @@ button:disabled{opacity:.4}
 </div>
 
 <script>
-// =============================
-// CONFIG
-// =============================
-const WEBHOOK_URL="https://script.google.com/macros/s/AKfycbzHQhkFyEck1pyM2_OlgHbFP2HqsEgLcX295rWE4wH0prMwqpLJ7gMJWWbJgbER29D5/exec";
-const EF_CAR=0.192;
+// ================= CONFIG =================
+const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzHQhkFyEck1pyM2_OlgHbFP2HqsEgLcX295rWE4wH0prMwqpLJ7gMJWWbJgbER29D5/exec";
+const EF_CAR = 0.192;
 
-// =============================
-// STATE
-// =============================
-let map,polyline,userMarker;
+// ================= STATE =================
+let map, polyline, userMarker;
 let watchId=null;
-
 let totalDistance=0;
 let lastPoint=null;
 let pathCoords=[];
@@ -112,9 +107,7 @@ let isTracking=false;
 let isPaused=false;
 let sessionActive=false;
 
-// =============================
-// MAP
-// =============================
+// ================= MAP =================
 function initMap(){
   map=new google.maps.Map(document.getElementById("map"),{
     center:{lat:13.7563,lng:100.5018},
@@ -123,7 +116,10 @@ function initMap(){
   });
 
   polyline=new google.maps.Polyline({
-    map,path:[],strokeColor:"#22c55e",strokeWeight:5
+    map,
+    path:[],
+    strokeColor:"#22c55e",
+    strokeWeight:5
   });
 
   userMarker=new google.maps.Marker({
@@ -135,66 +131,59 @@ function initMap(){
 }
 window.onload=initMap;
 
-// =============================
-// TIMER (ตัวจริง)
-// =============================
+// ================= TIMER =================
 function startTimer(){
   clearInterval(timerInterval);
   timerInterval=setInterval(()=>{
+    if(!isTracking) return;
     elapsedSeconds++;
-    const m=Math.floor(elapsedSeconds/60);
-    const s=elapsedSeconds%60;
-    time.textContent=`${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+    updateUI();
   },1000);
 }
 function stopTimer(){clearInterval(timerInterval);}
 
-// =============================
-// DISTANCE
-// =============================
+// ================= DISTANCE =================
 function getDistance(p1,p2){
   const R=6371000;
   const toRad=x=>x*Math.PI/180;
   const dLat=toRad(p2.lat-p1.lat);
   const dLon=toRad(p2.lng-p1.lng);
+
   const a=Math.sin(dLat/2)**2+
     Math.cos(toRad(p1.lat))*Math.cos(toRad(p2.lat))*
     Math.sin(dLon/2)**2;
+
   return 2*R*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
-// =============================
-// GPS
-// =============================
 function handlePosition(pos){
-  if(!isTracking||isPaused) return;
+  if(!isTracking) return;
 
-  const {latitude,longitude,accuracy}=pos.coords;
-  if(accuracy>30) return;
-
+  const {latitude,longitude}=pos.coords;
   const current={lat:latitude,lng:longitude};
 
   if(lastPoint){
-    const dist=getDistance(lastPoint,current);
-    if(dist<60) totalDistance+=dist;
+    const d=getDistance(lastPoint,current);
+    if(d<60) totalDistance+=d;
   }
 
   lastPoint=current;
   pathCoords.push(current);
   polyline.setPath(pathCoords);
   userMarker.setPosition(current);
-  map.panTo(current);
 
   updateUI();
 }
 
-// =============================
-// UI UPDATE
-// =============================
+// ================= UI =================
 function updateUI(){
   const km=totalDistance/1000;
   distance.textContent=km.toFixed(2);
   carbon.textContent=(km*EF_CAR).toFixed(3);
+
+  const m=Math.floor(elapsedSeconds/60).toString().padStart(2,"0");
+  const s=(elapsedSeconds%60).toString().padStart(2,"0");
+  time.textContent=`${m}:${s}`;
 }
 
 function updateButtons(){
@@ -204,54 +193,53 @@ function updateButtons(){
   pauseBtn.textContent=isPaused?"Resume":"Pause";
 }
 
-// =============================
-// START
-// =============================
+// ================= START =================
 startBtn.onclick=()=>{
-  if(!sessionActive){
-    resetSession();
-    sessionActive=true;
+  if(sessionActive) return;
 
-    watchId=navigator.geolocation.watchPosition(
-      handlePosition,
-      err=>console.error(err),
-      {enableHighAccuracy:true,maximumAge:1000,timeout:10000}
-    );
-  }
-
+  sessionActive=true;
   isTracking=true;
   isPaused=false;
+
+  totalDistance=0;
+  elapsedSeconds=0;
+  lastPoint=null;
+  pathCoords=[];
+
+  startTime=new Date();
+
   startTimer();
+
+  watchId=navigator.geolocation.watchPosition(
+    handlePosition,
+    err=>console.error(err),
+    {enableHighAccuracy:true,maximumAge:1000,timeout:10000}
+  );
+
   updateButtons();
 };
 
-// =============================
-// PAUSE
-// =============================
+// ================= PAUSE =================
 pauseBtn.onclick=()=>{
-  if(isTracking){
-    isTracking=false;
-    isPaused=true;
-    stopTimer();
-  }else if(isPaused){
-    isTracking=true;
-    isPaused=false;
-    startTimer();
-  }
+  if(!sessionActive) return;
+
+  isPaused=!isPaused;
+  isTracking=!isPaused;
+
   updateButtons();
 };
 
-// =============================
-// FINISH ⭐ FIXED
-// =============================
+// ================= FINISH =================
 finishBtn.onclick=async()=>{
   stopTimer();
 
   const endTime=new Date();
-  const km=totalDistance/1000;
 
-  // ✅ ใช้เวลาจริง
-  const durationMin=elapsedSeconds/60;
+  // ⭐ ทำให้ popup = sheet ตรงกัน
+  const kmDisplay=Number((totalDistance/1000).toFixed(2));
+  const durationMin=Number((elapsedSeconds/60).toFixed(2));
+  const co2Display=Number((kmDisplay*EF_CAR).toFixed(3));
+  const metersForSheet=Math.round(kmDisplay*1000);
 
   try{
     await fetch(WEBHOOK_URL,{
@@ -259,10 +247,10 @@ finishBtn.onclick=async()=>{
       headers:{ "Content-Type":"text/plain;charset=utf-8" },
       body:JSON.stringify({
         user_email:"test@test.com",
-        distance_m:Math.round(totalDistance),
-        duration_min:Number(durationMin.toFixed(2)),
-        co2_saved_kg:Number((km*EF_CAR).toFixed(3)),
-        started_at:new Date().toISOString(),
+        distance_m:metersForSheet,
+        duration_min:durationMin,
+        co2_saved_kg:co2Display,
+        started_at:startTime.toISOString(),
         ended_at:endTime.toISOString(),
         gps_path:JSON.stringify(pathCoords)
       })
@@ -272,9 +260,10 @@ finishBtn.onclick=async()=>{
     console.error("❌ send error",e);
   }
 
-  sumDist.textContent=km.toFixed(2);
+  // popup
+  sumDist.textContent=kmDisplay.toFixed(2);
   sumTime.textContent=time.textContent;
-  sumCarbon.textContent=(km*EF_CAR).toFixed(3);
+  sumCarbon.textContent=co2Display.toFixed(3);
   summaryModal.style.display="flex";
 
   if(watchId){
@@ -283,24 +272,14 @@ finishBtn.onclick=async()=>{
   }
 
   sessionActive=false;
-  resetSession();
+  isTracking=false;
+  isPaused=false;
   updateButtons();
 };
 
+// ================= MODAL =================
 function closeSummary(){
   summaryModal.style.display="none";
-}
-
-function resetSession(){
-  totalDistance=0;
-  lastPoint=null;
-  pathCoords=[];
-  elapsedSeconds=0;
-  isPaused=false;
-  isTracking=false;
-  polyline.setPath([]);
-  time.textContent="00:00";
-  updateUI();
 }
 </script>
 </body>
