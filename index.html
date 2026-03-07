@@ -376,14 +376,16 @@ document.getElementById("summaryModal").style.display="flex";
 if(watchId) navigator.geolocation.clearWatch(watchId);
 
 sessionActive=false;
+
 resetSession();
+
 updateButtons();
 
 
-// ===== AUTO RETURN TO GLIDE =====
+// ===== AUTO BACK TO GLIDE =====
 
 setTimeout(()=>{
-window.location.href="https://sustep.glide.page";
+window.history.back();
 },2000);
 
 };
