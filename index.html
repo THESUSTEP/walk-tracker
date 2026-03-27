@@ -3,73 +3,45 @@
 <head>
 <meta charset="utf-8" />
 <title>SUSTEP</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 
-<!-- ✅ Google Maps API ใหม่ -->
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD7xnpAUWUrhzQwSQZlfasfGY7ys3WlGOc"></script>
-
-<!-- ✅ html2canvas สำหรับแคป -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 
 <style>
-html,body{
-margin:0;height:100%;
-font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui;
-background:#000;
-}
+html,body{margin:0;height:100%;font-family:system-ui}
 #map{height:100%;width:100%}
 
-/* iOS Glass UI */
 .controls{
 position:absolute;
 left:50%;
 transform:translateX(-50%);
-bottom:20px;
-
-background:rgba(255,255,255,0.75);
-backdrop-filter:blur(25px);
--webkit-backdrop-filter:blur(25px);
-
-padding:18px;
-border-radius:28px;
-box-shadow:0 10px 40px rgba(0,0,0,.25);
-
+bottom:16px;
+background:white;
+padding:16px;
+border-radius:20px;
+box-shadow:0 10px 30px rgba(0,0,0,.2);
+width:90%;
+max-width:320px;
 text-align:center;
-width:92%;
-max-width:340px;
 }
 
-.stats{
-font-size:20px;
-font-weight:600;
-line-height:1.6;
-}
+.btn-row{display:flex;gap:12px;margin-top:10px}
+.btn-row button{flex:1}
 
-.time{
-font-size:14px;
-color:#555;
-}
-
-/* ปุ่ม */
 button{
 padding:14px;
 border:none;
 border-radius:999px;
-font-size:16px;
 font-weight:600;
+display:flex;
+justify-content:center;
+align-items:center;
 }
 
-.start{background:#34c759;color:white}
-.pause{background:#ff9f0a;color:white}
-.finish{background:#ff3b30;color:white}
-.save{background:#30d158;color:white}
-.done{background:#ff9f0a;color:white}
-
-button:disabled{opacity:.4}
-
-.btn-row{display:flex;gap:10px}
-.btn-row button{flex:1}
-.finish{width:100%;margin-top:8px}
+.start{background:#22c55e;color:white}
+.pause{background:#f59e0b;color:white}
+.finish{background:#ef4444;color:white;width:100%;margin-top:10px}
 
 /* modal */
 #summaryModal{
@@ -78,34 +50,21 @@ background:rgba(0,0,0,.4);
 display:none;
 align-items:center;
 justify-content:center;
-z-index:999;
 }
 
 .summary-card{
-background:rgba(255,255,255,0.9);
-backdrop-filter:blur(25px);
-padding:24px;
+background:white;
+padding:28px;
 border-radius:28px;
 width:85%;
 max-width:320px;
 text-align:center;
 }
 
-.big{
-font-size:40px;
-font-weight:700;
-margin:10px 0;
-}
-
-.sub{color:#666;margin-bottom:6px}
-.green{color:#22c55e;margin-bottom:12px}
-
-.btn-bottom{
-display:flex;
-gap:10px;
-margin-top:10px;
-}
-.btn-bottom button{flex:1}
+.summary-buttons{display:flex;gap:14px;margin-top:12px}
+.summary-buttons button{flex:1}
+.save-btn{background:#22c55e;color:white}
+.done-btn{background:#f59e0b;color:white}
 </style>
 </head>
 
@@ -114,11 +73,10 @@ margin-top:10px;
 <div id="map"></div>
 
 <div class="controls">
-
-<div class="stats">
-<span id="distance">0.00</span> km<br>
-<span class="time">เวลา <span id="time">00:00</span></span><br>
-<span style="color:#22c55e">ลด <span id="carbon">0.000</span> kgCO₂e</span>
+<div>
+ระยะทาง <b><span id="distance">0.00</span> km</b><br>
+ลด <b><span id="carbon">0.000</span> kgCO₂e</b><br>
+เวลา <span id="time">00:00</span>
 </div>
 
 <div class="btn-row">
@@ -127,102 +85,68 @@ margin-top:10px;
 </div>
 
 <button id="finishBtn" class="finish">Finish</button>
-
 </div>
 
-<!-- ✅ Summary -->
+<!-- SUMMARY -->
 <div id="summaryModal">
 <div class="summary-card" id="captureArea">
 
-<div class="big"><span id="sumDist">0.00</span> km</div>
+<h3>Walk Complete 🎉</h3>
 
-<div class="sub">เวลา <b id="sumTime">00:00</b></div>
+<h1><span id="sumDist">0.00</span> km</h1>
+<div>เวลา <span id="sumTime">00:00</span></div>
+<div>ลด <span id="sumCarbon">0.000</span> kgCO₂e</div>
+<div id="finishDateTime"></div>
 
-<div class="green">ลด <b id="sumCarbon">0.000</b> kgCO₂e</div>
-
-<div class="sub" id="sumDate"></div>
-
-<div class="btn-bottom">
-<button onclick="saveImage()" class="save">📸 Save</button>
-<button onclick="closeSummary()" class="done">Done</button>
+<div class="summary-buttons">
+<button onclick="saveImage()" class="save-btn">
+📷 Save
+</button>
+<button onclick="closeSummary()" class="done-btn">Done</button>
 </div>
 
 </div>
 </div>
 
 <script>
-
-// CONFIG
-const WEBHOOK_URL="https://script.google.com/macros/s/AKfycbz04fVf9Kr5QiJpIuJNdPuec5G7mTOTmbPd0246nE1pGlGq5HNlRR_Hc35gDX_ncovG/exec";
 const EF_CAR=0.192;
 
-// USER
-const params=new URLSearchParams(window.location.search);
-const userEmail=params.get("email")||"unknown";
-const userName=params.get("name")||"unknown";
-
-// STATE
-let map,polyline,userMarker;
-let watchId=null;
-
-let totalDistance=0;
-let lastPoint=null;
-let pathCoords=[];
-
-let elapsedSeconds=0;
-let timerInterval=null;
-
+let map,polyline,marker,watchId;
+let totalDistance=0,lastPoint=null;
+let elapsed=0,timer;
 let isTracking=false;
 let isPaused=false;
-let sessionActive=false;
-let startTime=null;
 
 // MAP
 function initMap(){
 map=new google.maps.Map(document.getElementById("map"),{
 center:{lat:13.7563,lng:100.5018},
-zoom:16,
-gestureHandling:"greedy"
+zoom:16
 });
-
-polyline=new google.maps.Polyline({
-map,
-path:[],
-strokeColor:"#34c759",
-strokeWeight:5
-});
-
-userMarker=new google.maps.Marker({
-map,
-position:{lat:13.7563,lng:100.5018}
-});
+polyline=new google.maps.Polyline({map,strokeColor:"#22c55e",strokeWeight:5});
+marker=new google.maps.Marker({map});
 }
-window.addEventListener("load",initMap);
+window.onload=initMap;
 
 // TIMER
 function startTimer(){
-clearInterval(timerInterval);
-timerInterval=setInterval(()=>{
-if(!isTracking) return;
-elapsedSeconds++;
+timer=setInterval(()=>{
+if(!isTracking||isPaused) return;
+elapsed++;
 updateUI();
 },1000);
 }
-function stopTimer(){clearInterval(timerInterval);}
 
 // DISTANCE
-function getDistance(p1,p2){
+function getDistance(a,b){
 const R=6371000;
 const toRad=x=>x*Math.PI/180;
-
-const dLat=toRad(p2.lat-p1.lat);
-const dLng=toRad(p2.lng-p1.lng);
-
-const a=Math.sin(dLat/2)**2+
-Math.cos(toRad(p1.lat))*Math.cos(toRad(p2.lat))*
+const dLat=toRad(b.lat-a.lat);
+const dLng=toRad(b.lng-a.lng);
+const x=Math.sin(dLat/2)**2+
+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*
 Math.sin(dLng/2)**2;
-
-return 2*R*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+return 2*R*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
 }
 
 // GPS
@@ -234,17 +158,17 @@ if(accuracy>30) return;
 
 const current={lat:latitude,lng:longitude};
 
+// ✅ ทำให้ map ตามตัวเรา
+map.setCenter(current);
+marker.setPosition(current);
+
 if(lastPoint){
-const dist=getDistance(lastPoint,current);
-if(dist<60) totalDistance+=dist;
+const d=getDistance(lastPoint,current);
+if(d>2 && d<80) totalDistance+=d;
 }
 
 lastPoint=current;
-pathCoords.push(current);
-
-polyline.setPath(pathCoords);
-userMarker.setPosition(current);
-map.panTo(current);
+polyline.getPath().push(current);
 
 updateUI();
 }
@@ -252,66 +176,70 @@ updateUI();
 // UI
 function updateUI(){
 const km=totalDistance/1000;
+distance.textContent=km.toFixed(2);
+carbon.textContent=(km*EF_CAR).toFixed(3);
 
-document.getElementById("distance").textContent=km.toFixed(2);
-document.getElementById("carbon").textContent=(km*EF_CAR).toFixed(3);
-
-const m=Math.floor(elapsedSeconds/60).toString().padStart(2,"0");
-const s=(elapsedSeconds%60).toString().padStart(2,"0");
-
-document.getElementById("time").textContent=`${m}:${s}`;
+const m=Math.floor(elapsed/60).toString().padStart(2,"0");
+const s=(elapsed%60).toString().padStart(2,"0");
+time.textContent=`${m}:${s}`;
 }
 
 // START
 startBtn.onclick=()=>{
-if(sessionActive) return;
+totalDistance=0;
+elapsed=0;
+lastPoint=null;
+polyline.setPath([]);
 
-sessionActive=true;
 isTracking=true;
 isPaused=false;
-startTime=new Date();
 
 startTimer();
 
-watchId=navigator.geolocation.watchPosition(handlePosition);
-
+watchId=navigator.geolocation.watchPosition(handlePosition,{
+enableHighAccuracy:true,
+maximumAge:0,
+timeout:5000
+});
 };
 
-// PAUSE
+// PAUSE (แก้ให้ใช้ได้จริง)
 pauseBtn.onclick=()=>{
-if(!sessionActive) return;
-
 isPaused=!isPaused;
-isTracking=!isPaused;
-
-if(isPaused) stopTimer();
-else startTimer();
+pauseBtn.textContent=isPaused?"Resume":"Pause";
 };
 
 // FINISH
-finishBtn.onclick=async()=>{
+finishBtn.onclick=()=>{
+isTracking=false;
+clearInterval(timer);
 
-stopTimer();
+navigator.geolocation.clearWatch(watchId);
 
 const km=(totalDistance/1000);
-const m=Math.floor(elapsedSeconds/60).toString().padStart(2,"0");
-const s=(elapsedSeconds%60).toString().padStart(2,"0");
+const m=Math.floor(elapsed/60).toString().padStart(2,"0");
+const s=(elapsed%60).toString().padStart(2,"0");
 
-document.getElementById("sumDist").textContent=km.toFixed(2);
-document.getElementById("sumTime").textContent=`${m}:${s}`;
-document.getElementById("sumCarbon").textContent=(km*EF_CAR).toFixed(3);
-document.getElementById("sumDate").textContent=new Date().toLocaleString();
+sumDist.textContent=km.toFixed(2);
+sumTime.textContent=`${m}:${s}`;
+sumCarbon.textContent=(km*EF_CAR).toFixed(3);
 
-document.getElementById("summaryModal").style.display="flex";
+// เวลา HH:MM
+const now=new Date();
+const d=String(now.getDate()).padStart(2,'0');
+const mo=String(now.getMonth()+1).padStart(2,'0');
+const y=now.getFullYear();
+const h=String(now.getHours()).padStart(2,'0');
+const mi=String(now.getMinutes()).padStart(2,'0');
 
-if(watchId) navigator.geolocation.clearWatch(watchId);
+finishDateTime.textContent=`${d}/${mo}/${y} ${h}:${mi}`;
 
-sessionActive=false;
+summaryModal.style.display="flex";
 };
 
-// SAVE IMAGE
+// SAVE
 function saveImage(){
-html2canvas(document.getElementById("captureArea")).then(canvas=>{
+html2canvas(document.querySelector("#captureArea")).then(canvas=>{
 const link=document.createElement("a");
 link.download="sustep.png";
 link.href=canvas.toDataURL();
@@ -319,9 +247,8 @@ link.click();
 });
 }
 
-// CLOSE
 function closeSummary(){
-document.getElementById("summaryModal").style.display="none";
+summaryModal.style.display="none";
 }
 </script>
 
