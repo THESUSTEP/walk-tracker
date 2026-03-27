@@ -3,54 +3,63 @@
 <head>
 <meta charset="utf-8" />
 <title>SUSTEP</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD7xnpAUWUrhzQwSQZlfasfGY7ys3WlGOc"></script>
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 
 <style>
-html,body{margin:0;height:100%;font-family:system-ui;background:#f4f7f6}
+html,body{
+margin:0;height:100%;
+font-family:system-ui;
+background:#f4f7f6;
+}
 #map{height:100%;width:100%}
 
-/* CONTROL BOX */
+/* CONTROL */
 .controls{
 position:absolute;
 left:50%;
 transform:translateX(-50%);
 bottom:16px;
-background:rgba(255,255,255,.96);
-padding:14px;
-border-radius:20px;
-box-shadow:0 15px 40px rgba(0,0,0,.22);
-text-align:center;
+background:white;
+padding:16px;
+border-radius:22px;
+box-shadow:0 15px 40px rgba(0,0,0,.2);
 width:92%;
-max-width:320px;
+max-width:340px;
+text-align:center;
 }
 
-/* BUTTON */
 button{
-padding:12px;
+padding:14px;
 border:none;
 border-radius:999px;
 font-weight:600;
 display:flex;
+justify-content:center;
 align-items:center;
-justify-content:center; /* ✅ กลาง */
 gap:6px;
-width:100%;
 }
 
 .start{background:#22c55e;color:white}
 .pause{background:#f59e0b;color:white}
 .finish{background:#ef4444;color:white}
 
-.btn-row{display:flex;gap:8px}
+.btn-row{
+display:flex;
+gap:12px;
+margin-top:10px;
+}
 .btn-row button{flex:1}
 
-/* SUMMARY */
+.finish{width:100%;margin-top:10px}
+
+/* MODAL */
 #summaryModal{
-position:fixed;inset:0;
-background:rgba(0,0,0,.45);
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.4);
 display:none;
 align-items:center;
 justify-content:center;
@@ -65,21 +74,35 @@ max-width:320px;
 text-align:center;
 }
 
-.main-metric{font-size:42px;font-weight:700}
-.unit{font-size:16px;color:#666}
-.time2{margin:6px 0}
-.carbon{color:#16a34a;margin:6px 0}
-.date{font-size:13px;color:#999;margin-bottom:16px}
+/* SUMMARY */
+.title{
+font-size:18px;
+font-weight:600;
+margin-bottom:8px;
+color:#16a34a;
+}
 
-/* ปุ่มล่าง */
+.main{
+font-size:42px;
+font-weight:700;
+}
+
+.time{margin:6px 0}
+.carbon{color:#16a34a;margin-bottom:6px}
+.date{font-size:13px;color:#999;margin-bottom:18px}
+
+/* ปุ่ม */
 .summary-buttons{
 display:flex;
-gap:10px;
+gap:14px;
 }
 
 .summary-buttons button{
-flex:1; /* ✅ เท่ากัน */
+flex:1;
 }
+
+.save-btn{background:#22c55e;color:white}
+.done-btn{background:#f59e0b;color:white}
 </style>
 </head>
 
@@ -88,9 +111,11 @@ flex:1; /* ✅ เท่ากัน */
 <div id="map"></div>
 
 <div class="controls">
+<div>
 ระยะทาง: <b><span id="distance">0.00</span> km</b><br>
 ลด: <b><span id="carbon">0.000</span></b><br>
 เวลา: <span id="time">00:00</span>
+</div>
 
 <div class="btn-row">
 <button id="startBtn" class="start">Start</button>
@@ -100,40 +125,45 @@ flex:1; /* ✅ เท่ากัน */
 <button id="finishBtn" class="finish">Finish</button>
 </div>
 
+<!-- SUMMARY -->
 <div id="summaryModal">
-<div class="summary-card">
+<div class="summary-card" id="captureArea">
 
-<div class="main-metric">
-<span id="sumDist">0.00</span><span class="unit"> km</span>
+<div class="title">Walk Complete 🎉</div>
+
+<div class="main">
+<span id="sumDist">0.00</span> km
 </div>
 
-<div class="time2">เวลา <span id="sumTime">00:00</span></div>
-<div class="carbon">ลด <span id="sumCarbon">0.000</span> kgCO₂e</div>
+<div class="time">เวลา <span id="sumTime">00:00</span></div>
+
+<div class="carbon">
+ลด <span id="sumCarbon">0.000</span> kgCO₂e
+</div>
+
 <div class="date" id="finishDateTime"></div>
 
 <div class="summary-buttons">
-
-<button onclick="saveImage()" class="start">
+<button onclick="saveImage()" class="save-btn">
 <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
 <path d="M9 2L7 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3l-2-2H9zm3 5a5 5 0 1 1 0 10 5 5 0 0 1 0-10z"/>
 </svg>
 Save
 </button>
 
-<button onclick="closeSummary()" class="pause">Done</button>
-
+<button onclick="closeSummary()" class="done-btn">Done</button>
 </div>
+
 </div>
 </div>
 
 <script>
-
 const EF_CAR=0.192;
 
 let map,polyline,userMarker,watchId;
-let totalDistance=0,lastPoint=null,pathCoords=[];
+let totalDistance=0,lastPoint=null;
 let elapsedSeconds=0,timerInterval;
-let isTracking=false,isPaused=false,startTime;
+let isTracking=false;
 
 // MAP
 function initMap(){
@@ -154,7 +184,6 @@ elapsedSeconds++;
 updateUI();
 },1000);
 }
-function stopTimer(){clearInterval(timerInterval);}
 
 // DISTANCE
 function getDistance(p1,p2){
@@ -168,42 +197,24 @@ Math.sin(dLng/2)**2;
 return 2*R*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
-// 🚶‍♀️ GPS เสถียร
+// GPS (เสถียรขึ้น)
 function handlePosition(pos){
-
-if(!isTracking||isPaused) return;
+if(!isTracking) return;
 
 const {latitude,longitude,accuracy}=pos.coords;
-
-// กรอง accuracy
-if(accuracy>20) return;
+if(accuracy>20) return; // 🔥 กันเด้ง
 
 const current={lat:latitude,lng:longitude};
 
 if(lastPoint){
-
-const dist=getDistance(lastPoint,current);
-
-// กันกระโดด
-if(dist>50) return;
-
-// กัน jitter
-if(dist<2) return;
-
-totalDistance+=dist;
+const d=getDistance(lastPoint,current);
+if(d>2 && d<50) totalDistance+=d; // 🔥 กัน jitter
 }
 
 lastPoint=current;
-pathCoords.push(current);
-
-polyline.setPath(pathCoords);
+polyline.getPath().push(current);
 userMarker.setPosition(current);
-
-// ลดกระตุก
-if(pathCoords.length%5===0){
 map.panTo(current);
-}
-
 updateUI();
 }
 
@@ -220,51 +231,49 @@ time.textContent=`${m}:${s}`;
 
 // START
 startBtn.onclick=()=>{
-resetSession();
+totalDistance=0;
+elapsedSeconds=0;
+lastPoint=null;
+
 isTracking=true;
-startTime=new Date();
 startTimer();
 
-watchId=navigator.geolocation.watchPosition(
-handlePosition,
-err=>console.error(err),
-{enableHighAccuracy:true,maximumAge:0,timeout:10000}
-);
-};
-
-// PAUSE
-pauseBtn.onclick=()=>{
-isPaused=!isPaused;
-isTracking=!isPaused;
-if(isPaused) stopTimer(); else startTimer();
+watchId=navigator.geolocation.watchPosition(handlePosition,{
+enableHighAccuracy:true
+});
 };
 
 // FINISH
 finishBtn.onclick=()=>{
-stopTimer();
+isTracking=false;
+clearInterval(timerInterval);
 
-const end=new Date();
-const km=Number((totalDistance/1000).toFixed(2));
-
+const km=(totalDistance/1000);
 const m=Math.floor(elapsedSeconds/60).toString().padStart(2,"0");
 const s=(elapsedSeconds%60).toString().padStart(2,"0");
-const timeText=`${m}:${s}`;
 
 sumDist.textContent=km.toFixed(2);
-sumTime.textContent=timeText;
+sumTime.textContent=`${m}:${s}`;
 sumCarbon.textContent=(km*EF_CAR).toFixed(3);
 
-finishDateTime.textContent=end.toLocaleString();
+// 🔥 เวลาเหลือแค่ HH:MM
+const now=new Date();
+const d=String(now.getDate()).padStart(2,'0');
+const mo=String(now.getMonth()+1).padStart(2,'0');
+const y=now.getFullYear();
+const h=String(now.getHours()).padStart(2,'0');
+const mi=String(now.getMinutes()).padStart(2,'0');
+
+finishDateTime.textContent=`${d}/${mo}/${y} ${h}:${mi}`;
 
 summaryModal.style.display="flex";
 
 navigator.geolocation.clearWatch(watchId);
-resetSession();
 };
 
-// 📸 SAVE (มีไอคอนในรูป)
+// SAVE
 function saveImage(){
-html2canvas(document.querySelector(".summary-card")).then(canvas=>{
+html2canvas(document.querySelector("#captureArea")).then(canvas=>{
 const link=document.createElement("a");
 link.download="sustep.png";
 link.href=canvas.toDataURL();
@@ -275,18 +284,6 @@ link.click();
 function closeSummary(){
 summaryModal.style.display="none";
 }
-
-function resetSession(){
-totalDistance=0;
-lastPoint=null;
-pathCoords=[];
-elapsedSeconds=0;
-isPaused=false;
-isTracking=false;
-polyline.setPath([]);
-updateUI();
-}
-
 </script>
 
 </body>
