@@ -9,14 +9,9 @@
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 
 <style>
-html,body{
-margin:0;height:100%;
-font-family:system-ui;
-background:#f4f7f6;
-}
+html,body{margin:0;height:100%;font-family:system-ui}
 #map{height:100%;width:100%}
 
-/* CONTROL */
 .controls{
 position:absolute;
 left:50%;
@@ -24,12 +19,15 @@ transform:translateX(-50%);
 bottom:16px;
 background:white;
 padding:16px;
-border-radius:22px;
-box-shadow:0 15px 40px rgba(0,0,0,.2);
-width:92%;
-max-width:340px;
+border-radius:20px;
+box-shadow:0 10px 30px rgba(0,0,0,.2);
+width:90%;
+max-width:320px;
 text-align:center;
 }
+
+.btn-row{display:flex;gap:12px;margin-top:10px}
+.btn-row button{flex:1}
 
 button{
 padding:14px;
@@ -39,26 +37,15 @@ font-weight:600;
 display:flex;
 justify-content:center;
 align-items:center;
-gap:6px;
 }
 
 .start{background:#22c55e;color:white}
 .pause{background:#f59e0b;color:white}
-.finish{background:#ef4444;color:white}
+.finish{background:#ef4444;color:white;width:100%;margin-top:10px}
 
-.btn-row{
-display:flex;
-gap:12px;
-margin-top:10px;
-}
-.btn-row button{flex:1}
-
-.finish{width:100%;margin-top:10px}
-
-/* MODAL */
+/* modal */
 #summaryModal{
-position:fixed;
-inset:0;
+position:fixed;inset:0;
 background:rgba(0,0,0,.4);
 display:none;
 align-items:center;
@@ -74,33 +61,8 @@ max-width:320px;
 text-align:center;
 }
 
-/* SUMMARY */
-.title{
-font-size:18px;
-font-weight:600;
-margin-bottom:8px;
-color:#16a34a;
-}
-
-.main{
-font-size:42px;
-font-weight:700;
-}
-
-.time{margin:6px 0}
-.carbon{color:#16a34a;margin-bottom:6px}
-.date{font-size:13px;color:#999;margin-bottom:18px}
-
-/* ปุ่ม summary */
-.summary-buttons{
-display:flex;
-gap:14px;
-}
-
-.summary-buttons button{
-flex:1;
-}
-
+.summary-buttons{display:flex;gap:14px;margin-top:12px}
+.summary-buttons button{flex:1}
 .save-btn{background:#22c55e;color:white}
 .done-btn{background:#f59e0b;color:white}
 </style>
@@ -112,9 +74,9 @@ flex:1;
 
 <div class="controls">
 <div>
-ระยะทาง: <b><span id="distance">0.00</span> km</b><br>
-ลด: <b><span id="carbon">0.000</span> kgCO₂e</b><br>
-เวลา: <span id="time">00:00</span>
+ระยะทาง <b><span id="distance">0.00</span> km</b><br>
+ลด <b><span id="carbon">0.000</span> kgCO₂e</b><br>
+เวลา <span id="time">00:00</span>
 </div>
 
 <div class="btn-row">
@@ -129,28 +91,17 @@ flex:1;
 <div id="summaryModal">
 <div class="summary-card" id="captureArea">
 
-<div class="title">Walk Complete 🎉</div>
+<h3>Walk Complete 🎉</h3>
 
-<div class="main">
-<span id="sumDist">0.00</span> km
-</div>
-
-<div class="time">เวลา <span id="sumTime">00:00</span></div>
-
-<div class="carbon">
-ลด <span id="sumCarbon">0.000</span> kgCO₂e
-</div>
-
-<div class="date" id="finishDateTime"></div>
+<h1><span id="sumDist">0.00</span> km</h1>
+<div>เวลา <span id="sumTime">00:00</span></div>
+<div>ลด <span id="sumCarbon">0.000</span> kgCO₂e</div>
+<div id="finishDateTime"></div>
 
 <div class="summary-buttons">
 <button onclick="saveImage()" class="save-btn">
-<svg width="16" height="16" viewBox="0 0 24 24" fill="white">
-<path d="M9 2L7 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3l-2-2H9zm3 5a5 5 0 1 1 0 10 5 5 0 0 1 0-10z"/>
-</svg>
-Save
+📷 Save
 </button>
-
 <button onclick="closeSummary()" class="done-btn">Done</button>
 </div>
 
@@ -160,10 +111,11 @@ Save
 <script>
 const EF_CAR=0.192;
 
-let map,polyline,userMarker,watchId;
+let map,polyline,marker,watchId;
 let totalDistance=0,lastPoint=null;
-let elapsedSeconds=0,timerInterval;
+let elapsed=0,timer;
 let isTracking=false;
+let isPaused=false;
 
 // MAP
 function initMap(){
@@ -171,55 +123,53 @@ map=new google.maps.Map(document.getElementById("map"),{
 center:{lat:13.7563,lng:100.5018},
 zoom:16
 });
-polyline=new google.maps.Polyline({
-map,
-path:[],
-strokeColor:"#22c55e",
-strokeWeight:5
-});
-userMarker=new google.maps.Marker({map});
+polyline=new google.maps.Polyline({map,strokeColor:"#22c55e",strokeWeight:5});
+marker=new google.maps.Marker({map});
 }
 window.onload=initMap;
 
 // TIMER
 function startTimer(){
-timerInterval=setInterval(()=>{
-if(!isTracking) return;
-elapsedSeconds++;
+timer=setInterval(()=>{
+if(!isTracking||isPaused) return;
+elapsed++;
 updateUI();
 },1000);
 }
 
 // DISTANCE
-function getDistance(p1,p2){
+function getDistance(a,b){
 const R=6371000;
 const toRad=x=>x*Math.PI/180;
-const dLat=toRad(p2.lat-p1.lat);
-const dLng=toRad(p2.lng-p1.lng);
-const a=Math.sin(dLat/2)**2+
-Math.cos(toRad(p1.lat))*Math.cos(toRad(p2.lat))*
+const dLat=toRad(b.lat-a.lat);
+const dLng=toRad(b.lng-a.lng);
+const x=Math.sin(dLat/2)**2+
+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*
 Math.sin(dLng/2)**2;
-return 2*R*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+return 2*R*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
 }
 
-// GPS เสถียร
+// GPS
 function handlePosition(pos){
-if(!isTracking) return;
+if(!isTracking||isPaused) return;
 
 const {latitude,longitude,accuracy}=pos.coords;
-if(accuracy>20) return;
+if(accuracy>30) return;
 
 const current={lat:latitude,lng:longitude};
 
+// ✅ ทำให้ map ตามตัวเรา
+map.setCenter(current);
+marker.setPosition(current);
+
 if(lastPoint){
 const d=getDistance(lastPoint,current);
-if(d>2 && d<50) totalDistance+=d;
+if(d>2 && d<80) totalDistance+=d;
 }
 
 lastPoint=current;
 polyline.getPath().push(current);
-userMarker.setPosition(current);
-map.panTo(current);
+
 updateUI();
 }
 
@@ -229,33 +179,46 @@ const km=totalDistance/1000;
 distance.textContent=km.toFixed(2);
 carbon.textContent=(km*EF_CAR).toFixed(3);
 
-const m=Math.floor(elapsedSeconds/60).toString().padStart(2,"0");
-const s=(elapsedSeconds%60).toString().padStart(2,"0");
+const m=Math.floor(elapsed/60).toString().padStart(2,"0");
+const s=(elapsed%60).toString().padStart(2,"0");
 time.textContent=`${m}:${s}`;
 }
 
 // START
 startBtn.onclick=()=>{
 totalDistance=0;
-elapsedSeconds=0;
+elapsed=0;
 lastPoint=null;
+polyline.setPath([]);
 
 isTracking=true;
+isPaused=false;
+
 startTimer();
 
 watchId=navigator.geolocation.watchPosition(handlePosition,{
-enableHighAccuracy:true
+enableHighAccuracy:true,
+maximumAge:0,
+timeout:5000
 });
+};
+
+// PAUSE (แก้ให้ใช้ได้จริง)
+pauseBtn.onclick=()=>{
+isPaused=!isPaused;
+pauseBtn.textContent=isPaused?"Resume":"Pause";
 };
 
 // FINISH
 finishBtn.onclick=()=>{
 isTracking=false;
-clearInterval(timerInterval);
+clearInterval(timer);
+
+navigator.geolocation.clearWatch(watchId);
 
 const km=(totalDistance/1000);
-const m=Math.floor(elapsedSeconds/60).toString().padStart(2,"0");
-const s=(elapsedSeconds%60).toString().padStart(2,"0");
+const m=Math.floor(elapsed/60).toString().padStart(2,"0");
+const s=(elapsed%60).toString().padStart(2,"0");
 
 sumDist.textContent=km.toFixed(2);
 sumTime.textContent=`${m}:${s}`;
@@ -272,8 +235,6 @@ const mi=String(now.getMinutes()).padStart(2,'0');
 finishDateTime.textContent=`${d}/${mo}/${y} ${h}:${mi}`;
 
 summaryModal.style.display="flex";
-
-navigator.geolocation.clearWatch(watchId);
 };
 
 // SAVE
