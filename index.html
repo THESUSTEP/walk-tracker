@@ -5,21 +5,19 @@
 <title>SUSTEP</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAdXvTwv1cry2Q2yNZkCgaxpZy04YQw_sw"></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAdXvTwv1cry2Q2yNZkCgaxpZy04fVf9Kr5QiJpIuJNdPuec5G7mTOTmbPd0246nE1pGlGq5HNlRR_Hc35gDX_ncovG"></script>
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 
 <style>
-html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f4f7f6}
+html,body{margin:0;height:100%;font-family:system-ui;background:#f4f7f6}
 #map{height:100%;width:100%}
 
-/* control */
 .controls{
 position:absolute;
 left:50%;
 transform:translateX(-50%);
 bottom:16px;
 background:rgba(255,255,255,.96);
-backdrop-filter:blur(12px);
 padding:14px 16px;
 border-radius:20px;
 box-shadow:0 15px 40px rgba(0,0,0,.22);
@@ -28,32 +26,27 @@ width:92%;
 max-width:320px;
 }
 
-.stats{font-size:14px;margin-bottom:8px;line-height:1.5}
+.stats{font-size:14px;margin-bottom:8px}
 .time{font-size:13px;color:#666}
 
 button{
 padding:12px 16px;margin:4px;border:none;
-border-radius:999px;font-size:15px;font-weight:600;
-display:inline-flex;
-align-items:center;
-justify-content:center;
-gap:6px;
+border-radius:999px;font-weight:600;
+display:inline-flex;align-items:center;gap:6px;
 }
 
 .start{background:#22c55e;color:white}
 .pause{background:#f59e0b;color:white}
 .finish{background:#ef4444;color:white}
 
-button:disabled{opacity:.4}
-
 .btn-row{display:flex;gap:8px}
 .btn-row button{flex:1}
+
 .finish{width:100%;margin-top:6px}
 
-/* modal */
 #summaryModal{
 position:fixed;inset:0;background:rgba(0,0,0,.45);
-display:none;align-items:center;justify-content:center;z-index:999;
+display:none;align-items:center;justify-content:center;
 }
 
 .summary-card{
@@ -66,43 +59,11 @@ text-align:center;
 }
 
 /* Apple style */
-.title{
-font-size:18px;
-font-weight:600;
-margin-bottom:12px;
-}
-
-.main-metric{
-font-size:42px;
-font-weight:700;
-letter-spacing:-1px;
-margin-bottom:6px;
-}
-
-.unit{
-font-size:16px;
-color:#666;
-margin-left:4px;
-}
-
-.time2{
-font-size:15px;
-color:#444;
-margin-bottom:6px;
-}
-
-.carbon{
-font-size:16px;
-font-weight:600;
-color:#16a34a;
-margin-bottom:6px;
-}
-
-.date{
-font-size:13px;
-color:#999;
-margin-bottom:18px;
-}
+.main-metric{font-size:42px;font-weight:700;margin-bottom:6px}
+.unit{font-size:16px;color:#666}
+.time2{font-size:15px;margin-bottom:6px}
+.carbon{font-size:16px;color:#16a34a;margin-bottom:6px}
+.date{font-size:13px;color:#999;margin-bottom:18px}
 </style>
 </head>
 
@@ -111,7 +72,6 @@ margin-bottom:18px;
 <div id="map"></div>
 
 <div class="controls">
-
 <div class="stats">
 ระยะทาง: <b><span id="distance">0.00</span> km</b><br>
 ลด: <b><span id="carbon">0.000</span> kgCO₂e</b><br>
@@ -124,33 +84,25 @@ margin-bottom:18px;
 </div>
 
 <button id="finishBtn" class="finish">Finish</button>
-
 </div>
 
 <div id="summaryModal">
 <div class="summary-card">
 
-<div class="title">Walk Complete</div>
-
-<!-- km -->
 <div class="main-metric">
-<span id="sumDist">0.00</span><span class="unit">km</span>
+<span id="sumDist">0.00</span><span class="unit"> km</span>
 </div>
 
-<!-- เวลา -->
 <div class="time2">
 เวลา <span id="sumTime">00:00</span>
 </div>
 
-<!-- ลด -->
 <div class="carbon">
 ลด <span id="sumCarbon">0.000</span> kgCO₂e
 </div>
 
-<!-- วันที่ -->
 <div class="date" id="finishDateTime">-</div>
 
-<!-- ปุ่ม -->
 <button onclick="saveImage()" class="start">
 <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
 <path d="M9 2L7 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3l-2-2H9zm3 5a5 5 0 1 1 0 10 5 5 0 0 1 0-10z"/>
@@ -165,63 +117,36 @@ Save
 
 <script>
 
+const WEBHOOK_URL="https://script.google.com/macros/s/AKfycbz04fVf9Kr5QiJpIuJNdPuec5G7mTOTmbPd0246nE1pGlGq5HNlRR_Hc35gDX_ncovG/exec";
 const EF_CAR=0.192;
 
-let map,polyline,userMarker;
-let watchId=null;
-
-let totalDistance=0;
-let lastPoint=null;
-let pathCoords=[];
-
-let elapsedSeconds=0;
-let timerInterval=null;
-
-let isTracking=false;
-let isPaused=false;
-let sessionActive=false;
+let map,polyline,userMarker,watchId;
+let totalDistance=0,lastPoint=null,pathCoords=[];
+let elapsedSeconds=0,timerInterval;
+let isTracking=false,isPaused=false,sessionActive=false,startTime;
 
 // MAP
 function initMap(){
-map=new google.maps.Map(document.getElementById("map"),{
-center:{lat:13.7563,lng:100.5018},
-zoom:16
-});
-
-polyline=new google.maps.Polyline({
-map,
-path:[],
-strokeColor:"#22c55e",
-strokeWeight:5
-});
-
-userMarker=new google.maps.Marker({
-map,
-position:{lat:13.7563,lng:100.5018}
-});
-
-updateButtons();
+map=new google.maps.Map(document.getElementById("map"),{center:{lat:13.7563,lng:100.5018},zoom:16});
+polyline=new google.maps.Polyline({map,path:[],strokeColor:"#22c55e",strokeWeight:5});
+userMarker=new google.maps.Marker({map,position:{lat:13.7563,lng:100.5018}});
 }
-window.addEventListener("load",initMap);
+window.onload=initMap;
 
 // TIMER
 function startTimer(){
-clearInterval(timerInterval);
 timerInterval=setInterval(()=>{
 if(!isTracking) return;
 elapsedSeconds++;
 updateUI();
 },1000);
 }
-
 function stopTimer(){clearInterval(timerInterval);}
 
 // DISTANCE
 function getDistance(p1,p2){
-const R=6371000;
-const toRad=x=>x*Math.PI/180;
-const dLat=toRad(p2.lat-p1.lat);
-const dLng=toRad(p2.lng-p1.lng);
+const R=6371000,toRad=x=>x*Math.PI/180;
+const dLat=toRad(p2.lat-p1.lat),dLng=toRad(p2.lng-p1.lng);
 const a=Math.sin(dLat/2)**2+
 Math.cos(toRad(p1.lat))*Math.cos(toRad(p2.lat))*
 Math.sin(dLng/2)**2;
@@ -231,7 +156,6 @@ return 2*R*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 // GPS
 function handlePosition(pos){
 if(!isTracking||isPaused) return;
-
 const {latitude,longitude,accuracy}=pos.coords;
 if(accuracy>30) return;
 
@@ -244,98 +168,85 @@ if(dist<60) totalDistance+=dist;
 
 lastPoint=current;
 pathCoords.push(current);
-
 polyline.setPath(pathCoords);
 userMarker.setPosition(current);
 map.panTo(current);
-
 updateUI();
 }
 
 // UI
 function updateUI(){
 const km=totalDistance/1000;
-document.getElementById("distance").textContent=km.toFixed(2);
-document.getElementById("carbon").textContent=(km*EF_CAR).toFixed(3);
+distance.textContent=km.toFixed(2);
+carbon.textContent=(km*EF_CAR).toFixed(3);
 
 const m=Math.floor(elapsedSeconds/60).toString().padStart(2,"0");
 const s=(elapsedSeconds%60).toString().padStart(2,"0");
-document.getElementById("time").textContent=`${m}:${s}`;
-}
-
-// BUTTONS
-function updateButtons(){
-startBtn.disabled=sessionActive;
-pauseBtn.disabled=!sessionActive;
-finishBtn.disabled=!sessionActive;
-pauseBtn.textContent=isPaused?"Resume":"Pause";
+time.textContent=`${m}:${s}`;
 }
 
 // START
 startBtn.onclick=()=>{
-if(sessionActive) return;
-
 resetSession();
-
-sessionActive=true;
-isTracking=true;
-isPaused=false;
-
+sessionActive=true;isTracking=true;isPaused=false;
+startTime=new Date();
 startTimer();
-
-watchId=navigator.geolocation.watchPosition(
-handlePosition,
-err=>console.error(err),
-{enableHighAccuracy:true}
-);
-
-updateButtons();
+watchId=navigator.geolocation.watchPosition(handlePosition);
 };
 
 // PAUSE
 pauseBtn.onclick=()=>{
-if(!sessionActive) return;
-
 isPaused=!isPaused;
 isTracking=!isPaused;
-
-if(isPaused) stopTimer();
-else startTimer();
-
-updateButtons();
+if(isPaused) stopTimer(); else startTimer();
 };
 
 // FINISH
-finishBtn.onclick=()=>{
-if(!sessionActive) return;
-
+finishBtn.onclick=async()=>{
 stopTimer();
 
-const km=(totalDistance/1000).toFixed(2);
+const endTime=new Date();
+const km=(totalDistance/1000);
+const kmDisplay=Number(km.toFixed(2));
+
 const m=Math.floor(elapsedSeconds/60).toString().padStart(2,"0");
 const s=(elapsedSeconds%60).toString().padStart(2,"0");
+const timeText=`${m}:${s}`;
 
-document.getElementById("sumDist").textContent=km;
-document.getElementById("sumTime").textContent=`${m}:${s}`;
-document.getElementById("sumCarbon").textContent=(km*EF_CAR).toFixed(3);
+// ยิงชีต (ของเดิมคุณ)
+await fetch(WEBHOOK_URL,{
+method:"POST",
+headers:{ "Content-Type":"text/plain;charset=utf-8" },
+body:JSON.stringify({
+user_email:"test",
+user_name:"test",
+distance_km:kmDisplay,
+duration_text:timeText,
+co2_saved_kg:Number((kmDisplay*EF_CAR).toFixed(3)),
+started_at:startTime.toISOString(),
+ended_at:endTime.toISOString(),
+gps_path:JSON.stringify(pathCoords)
+})
+});
+
+// UI
+sumDist.textContent=kmDisplay.toFixed(2);
+sumTime.textContent=timeText;
+sumCarbon.textContent=(kmDisplay*EF_CAR).toFixed(3);
 
 // วันที่
-const now=new Date();
-const d=String(now.getDate()).padStart(2,'0');
-const mo=String(now.getMonth()+1).padStart(2,'0');
-const y=now.getFullYear();
-const h=String(now.getHours()).padStart(2,'0');
-const mi=String(now.getMinutes()).padStart(2,'0');
+const d=String(endTime.getDate()).padStart(2,'0');
+const mo=String(endTime.getMonth()+1).padStart(2,'0');
+const y=endTime.getFullYear();
+const h=String(endTime.getHours()).padStart(2,'0');
+const mi=String(endTime.getMinutes()).padStart(2,'0');
 
-document.getElementById("finishDateTime").textContent=`${d}/${mo}/${y} ${h}:${mi}`;
+finishDateTime.textContent=`${d}/${mo}/${y} ${h}:${mi}`;
 
-document.getElementById("summaryModal").style.display="flex";
+summaryModal.style.display="flex";
 
 navigator.geolocation.clearWatch(watchId);
-
-sessionActive=false;
 resetSession();
-updateButtons();
 };
 
 // SAVE
@@ -348,21 +259,15 @@ link.click();
 });
 }
 
-// CLOSE
 function closeSummary(){
-document.getElementById("summaryModal").style.display="none";
+summaryModal.style.display="none";
 }
 
-// RESET
 function resetSession(){
-totalDistance=0;
-lastPoint=null;
-pathCoords=[];
-elapsedSeconds=0;
-isPaused=false;
-isTracking=false;
+totalDistance=0;lastPoint=null;pathCoords=[];
+elapsedSeconds=0;isPaused=false;isTracking=false;
 polyline.setPath([]);
-document.getElementById("time").textContent="00:00";
+time.textContent="00:00";
 updateUI();
 }
 
