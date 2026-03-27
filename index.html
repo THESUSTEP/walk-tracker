@@ -5,9 +5,7 @@
 <title>SUSTEP</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 
-<!-- ✅ API KEY ใหม่ -->
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD7xnpAUWUrhzQwSQZlfasfGY7ys3WlGOc"></script>
-
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 
 <style>
@@ -43,7 +41,6 @@ display:inline-flex;align-items:center;gap:6px;
 
 .btn-row{display:flex;gap:8px}
 .btn-row button{flex:1}
-
 .finish{width:100%;margin-top:6px}
 
 #summaryModal{
@@ -121,6 +118,11 @@ Save
 const WEBHOOK_URL="https://script.google.com/macros/s/AKfycbz04fVf9Kr5QiJpIuJNdPuec5G7mTOTmbPd0246nE1pGlGq5HNlRR_Hc35gDX_ncovG/exec";
 const EF_CAR=0.192;
 
+// ✅ ดึงชื่อจริงจาก URL
+const params=new URLSearchParams(window.location.search);
+const userEmail=params.get("email")||"unknown";
+const userName=params.get("name")||"unknown";
+
 let map,polyline,userMarker,watchId;
 let totalDistance=0,lastPoint=null,pathCoords=[];
 let elapsedSeconds=0,timerInterval;
@@ -145,7 +147,6 @@ map,
 position:{lat:13.7563,lng:100.5018}
 });
 }
-
 window.onload=initMap;
 
 // TIMER
@@ -156,10 +157,7 @@ elapsedSeconds++;
 updateUI();
 },1000);
 }
-
-function stopTimer(){
-clearInterval(timerInterval);
-}
+function stopTimer(){clearInterval(timerInterval);}
 
 // DISTANCE
 function getDistance(p1,p2){
@@ -174,7 +172,6 @@ return 2*R*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 // GPS
 function handlePosition(pos){
 if(!isTracking||isPaused) return;
-
 const {latitude,longitude,accuracy}=pos.coords;
 if(accuracy>30) return;
 
@@ -198,46 +195,32 @@ updateUI();
 // UI
 function updateUI(){
 const km=totalDistance/1000;
-
-document.getElementById("distance").textContent=km.toFixed(2);
-document.getElementById("carbon").textContent=(km*EF_CAR).toFixed(3);
+distance.textContent=km.toFixed(2);
+carbon.textContent=(km*EF_CAR).toFixed(3);
 
 const m=Math.floor(elapsedSeconds/60).toString().padStart(2,"0");
 const s=(elapsedSeconds%60).toString().padStart(2,"0");
-
-document.getElementById("time").textContent=`${m}:${s}`;
+time.textContent=`${m}:${s}`;
 }
 
 // START
-document.getElementById("startBtn").onclick=()=>{
+startBtn.onclick=()=>{
 resetSession();
-
-sessionActive=true;
-isTracking=true;
-isPaused=false;
-
+sessionActive=true;isTracking=true;isPaused=false;
 startTime=new Date();
-
 startTimer();
-
-watchId=navigator.geolocation.watchPosition(
-handlePosition,
-err=>console.error(err),
-{enableHighAccuracy:true}
-);
+watchId=navigator.geolocation.watchPosition(handlePosition);
 };
 
 // PAUSE
-document.getElementById("pauseBtn").onclick=()=>{
+pauseBtn.onclick=()=>{
 isPaused=!isPaused;
 isTracking=!isPaused;
-
-if(isPaused) stopTimer();
-else startTimer();
+if(isPaused) stopTimer(); else startTimer();
 };
 
 // FINISH
-document.getElementById("finishBtn").onclick=async()=>{
+finishBtn.onclick=async()=>{
 stopTimer();
 
 const endTime=new Date();
@@ -253,8 +236,8 @@ await fetch(WEBHOOK_URL,{
 method:"POST",
 headers:{ "Content-Type":"text/plain;charset=utf-8" },
 body:JSON.stringify({
-user_email:"test",
-user_name:"test",
+user_email:userEmail,
+user_name:userName,
 distance_km:kmDisplay,
 duration_text:timeText,
 co2_saved_kg:Number((kmDisplay*EF_CAR).toFixed(3)),
@@ -265,27 +248,25 @@ gps_path:JSON.stringify(pathCoords)
 });
 
 // UI
-document.getElementById("sumDist").textContent=kmDisplay.toFixed(2);
-document.getElementById("sumTime").textContent=timeText;
-document.getElementById("sumCarbon").textContent=(kmDisplay*EF_CAR).toFixed(3);
+sumDist.textContent=kmDisplay.toFixed(2);
+sumTime.textContent=timeText;
+sumCarbon.textContent=(kmDisplay*EF_CAR).toFixed(3);
 
-// วันที่
 const d=String(endTime.getDate()).padStart(2,'0');
 const mo=String(endTime.getMonth()+1).padStart(2,'0');
 const y=endTime.getFullYear();
 const h=String(endTime.getHours()).padStart(2,'0');
 const mi=String(endTime.getMinutes()).padStart(2,'0');
 
-document.getElementById("finishDateTime").textContent=`${d}/${mo}/${y} ${h}:${mi}`;
+finishDateTime.textContent=`${d}/${mo}/${y} ${h}:${mi}`;
 
-document.getElementById("summaryModal").style.display="flex";
+summaryModal.style.display="flex";
 
 navigator.geolocation.clearWatch(watchId);
-
 resetSession();
 };
 
-// SAVE IMAGE
+// SAVE
 function saveImage(){
 html2canvas(document.querySelector(".summary-card")).then(canvas=>{
 const link=document.createElement("a");
@@ -296,21 +277,14 @@ link.click();
 }
 
 function closeSummary(){
-document.getElementById("summaryModal").style.display="none";
+summaryModal.style.display="none";
 }
 
-// RESET
 function resetSession(){
-totalDistance=0;
-lastPoint=null;
-pathCoords=[];
-elapsedSeconds=0;
-isPaused=false;
-isTracking=false;
-
+totalDistance=0;lastPoint=null;pathCoords=[];
+elapsedSeconds=0;isPaused=false;isTracking=false;
 polyline.setPath([]);
-
-document.getElementById("time").textContent="00:00";
+time.textContent="00:00";
 updateUI();
 }
 
