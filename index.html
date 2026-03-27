@@ -66,7 +66,9 @@ max-width:340px;
 text-align:center;
 }
 
-.main-number{font-size:44px;font-weight:700}
+/* ✅ ปรับขนาดตัวเลข (เล็กลง) */
+.main-number{font-size:38px;font-weight:700}
+
 .sub{color:#666;margin-top:6px}
 .green{color:#16a34a;margin-top:6px}
 
@@ -189,24 +191,29 @@ Math.sin(dLng/2)**2;
 return 2*R*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
-/* GPS */
+/* ✅ GPS เสถียรขึ้น */
 function handlePosition(pos){
 if(!isTracking||isPaused) return;
 
 const {latitude,longitude,accuracy}=pos.coords;
-if(accuracy>30) return;
+
+if(accuracy>50) return;
 
 const current={lat:latitude,lng:longitude};
 
 if(lastPoint){
 const dist=getDistance(lastPoint,current);
-if(dist<60) totalDistance+=dist;
+
+if(dist>0.5 && dist<30){
+totalDistance+=dist;
+}
 }
 
 lastPoint=current;
-pathCoords.push(current);
 
+pathCoords.push(current);
 polyline.setPath(pathCoords);
+
 map.panTo(current);
 
 updateUI();
@@ -231,7 +238,17 @@ isTracking=true;
 isPaused=false;
 startTime=new Date();
 startTimer();
-watchId=navigator.geolocation.watchPosition(handlePosition);
+
+/* ✅ ปรับ GPS */
+watchId=navigator.geolocation.watchPosition(
+handlePosition,
+(err)=>console.log(err),
+{
+enableHighAccuracy:true,
+maximumAge:0,
+timeout:10000
+}
+);
 };
 
 /* PAUSE */
