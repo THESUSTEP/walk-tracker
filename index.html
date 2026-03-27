@@ -91,7 +91,7 @@ font-weight:700;
 .carbon{color:#16a34a;margin-bottom:6px}
 .date{font-size:13px;color:#999;margin-bottom:18px}
 
-/* ปุ่ม */
+/* ปุ่ม summary */
 .summary-buttons{
 display:flex;
 gap:14px;
@@ -113,7 +113,7 @@ flex:1;
 <div class="controls">
 <div>
 ระยะทาง: <b><span id="distance">0.00</span> km</b><br>
-ลด: <b><span id="carbon">0.000</span></b><br>
+ลด: <b><span id="carbon">0.000</span> kgCO₂e</b><br>
 เวลา: <span id="time">00:00</span>
 </div>
 
@@ -171,7 +171,12 @@ map=new google.maps.Map(document.getElementById("map"),{
 center:{lat:13.7563,lng:100.5018},
 zoom:16
 });
-polyline=new google.maps.Polyline({map,path:[],strokeColor:"#22c55e"});
+polyline=new google.maps.Polyline({
+map,
+path:[],
+strokeColor:"#22c55e",
+strokeWeight:5
+});
 userMarker=new google.maps.Marker({map});
 }
 window.onload=initMap;
@@ -197,18 +202,18 @@ Math.sin(dLng/2)**2;
 return 2*R*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
-// GPS (เสถียรขึ้น)
+// GPS เสถียร
 function handlePosition(pos){
 if(!isTracking) return;
 
 const {latitude,longitude,accuracy}=pos.coords;
-if(accuracy>20) return; // 🔥 กันเด้ง
+if(accuracy>20) return;
 
 const current={lat:latitude,lng:longitude};
 
 if(lastPoint){
 const d=getDistance(lastPoint,current);
-if(d>2 && d<50) totalDistance+=d; // 🔥 กัน jitter
+if(d>2 && d<50) totalDistance+=d;
 }
 
 lastPoint=current;
@@ -256,7 +261,7 @@ sumDist.textContent=km.toFixed(2);
 sumTime.textContent=`${m}:${s}`;
 sumCarbon.textContent=(km*EF_CAR).toFixed(3);
 
-// 🔥 เวลาเหลือแค่ HH:MM
+// เวลา HH:MM
 const now=new Date();
 const d=String(now.getDate()).padStart(2,'0');
 const mo=String(now.getMonth()+1).padStart(2,'0');
